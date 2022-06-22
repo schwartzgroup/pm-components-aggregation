@@ -1,0 +1,25 @@
+The size of the data makes in-memory point-in-polygon joins impractical and
+simple GeoPackage queries via `ogr2ogr` slow (see the deprecated code in
+`stage2_setup_gpkg.sh`). It's much faster to instead either process the
+generated `working.gpkg` file in QGIS or import it into PostGIS, index the
+tables, and run the spatial join there.
+
+In QGIS, the relevant process is in the Processing Toolbox, in "Vector
+selection" -> "Extract by location". This uses low amounts of memory and runs
+relatively fast since we are querying against GeoPackages. Since we are doing a
+join from one Census block to many grid cells, the parameters should be:
+
+* "Extract features from" -> The grid of points, e.g. `NE1_urban`
+* "Where the features (geometric predicate)" -> "are within"
+* "By comparing to the features from" -> The blocks, e.g. `blocks_2000_NE1`
+* "Extracted (location)" -> The path to save the crosswalk to
+
+At the bottom left of the pop-up window, there is also a "Run as Batch
+Process..." button where you can fill in parameters for each Census region's
+grid to have all joins run automatically one after another.
+
+The resulting crosswalks should be compressed and saved to
+`output/crosswalks/[REGION]_[rural/urban]_within_blocks_[year].csv.gz`, e.g.
+`NE1_urban_within_blocks_2000.csv.gz` and should have the fields `gridcell_idx`
+(the grid cell ID) and either `BLKIDFP00` or `GEOID10` (the GEOID for Census
+vintages 2000 and 2010, respectively).
