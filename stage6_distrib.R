@@ -61,10 +61,6 @@ generate_distrib <- function(region, # e.g. "NE1"
   return(result)
 }
 
-pbapply(
-  
-)
-
 invisible(pbapply(
   expand.grid(
     region = names(FIPS_BY_REGION),
@@ -80,7 +76,7 @@ invisible(pbapply(
       DISTRIB_DIR,
       sprintf(
         "%s_%s_%s_%s.csv.gz",
-        row["region"], gsub("blocks", "block_groups", row["geography"]), row["urban_rural"], row["species"]
+        row["region"], row["geography"], row["urban_rural"], row["species"]
       )
     )
     if (!file.exists(output_file)) {
