@@ -49,8 +49,8 @@ generate_distrib <- function(region, # e.g. "NE1"
     result <- aggregated
   }
   
-  message("> Choosing best predictor and subsetting columns")
   if (grepl("blocks", geography)) {
+    message("> Choosing best predictor and subsetting columns")
     result <- result[, predicted := fifelse(is.na(predicted_within),
                                         predicted_nearest,
                                         predicted_within)]
