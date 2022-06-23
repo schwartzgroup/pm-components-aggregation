@@ -23,10 +23,6 @@ urban_files <- get_predicted_files("Urban areas at 50m spatial resolution")
 
 rural_files <- get_predicted_files("Non-urban areas at 1km spatial resolution")
 
-# How many files do we have?
-xtabs(~ region + year + species, data = urban_files)
-xtabs(~ region + year + species, data = rural_files)
-
 # Create crosswalks -------------------------------------------------------
 # The same grid is reused within each region for all different species and
 # years, so we can just create a single crosswalk for each grid and reuse it for
