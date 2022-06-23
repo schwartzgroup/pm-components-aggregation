@@ -21,6 +21,23 @@ FIPS_BY_REGION <- list(
   "P9"   = c("06", "41", "53") # removed Alaska and Hawaii
 )
 
+# Lengths of nested GEOIDs
+# https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html
+GEOID_LENGTHS <- c(
+  blocks = 15,
+  block_groups = 12,
+  tracts = 11,
+  counties = 5
+)
+
+# GEOIDs in 2010 all are named "GEOID10"; in 2000, they have different names
+GEOID_NAMES_2000 <- c(
+  blocks = "BLKIDFP00",
+  block_groups = "BKGPIDFP00",
+  tracts = "CTIDFP00",
+  counties = "CNTYIDFP00"
+)
+
 # Directories -------------------------------------------------------------
 
 ## Inputs ----

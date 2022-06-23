@@ -143,7 +143,7 @@ blocks_2010_centroids_urban <- st_read(file.path(
   GEO_DIR, "blocks_2010_centroids_urban.gpkg"
 )) 
 
-# Build classifications ---------------------------------------------------
+# Build Census block classifications --------------------------------------
 
 blocks_2000_classification <- data.frame(
   BLKIDFP00 = blocks_2000$BLKIDFP00
@@ -228,38 +228,41 @@ blocks_2000_classification <- blocks_2000_classification %>%
   filter(substr(BLKIDFP00, 1, 2) < "60") %>%
   mutate(population = ifelse(is.na(population), 0, population))
 
-## Census block group classification ----
+### Write out ----
 
-block_groups_2000_classification <- blocks_2000_classification %>%
-  mutate(
-    BKGPIDFP00 = substr(BLKIDFP00, 1, 12), # Convert to Census block group GEOID
-    population_urban = population * urban
-  ) %>%
-  group_by(BKGPIDFP00) %>%
-  summarise(
-    population = sum(population),
-    population_urban = sum(population_urban),
-    pct_population_urban = sum(population_urban) / sum(population),
-    fully_predicted = as.numeric(all(fully_predicted == 1))
-  ) %>%
-  mutate(urban = as.numeric(pct_population_urban > PCT_POP_URBAN_CUTOFF))
-
-block_groups_2010_classification <- blocks_2010_classification %>%
-  mutate(
-    GEOID10 = substr(GEOID10, 1, 12), # Convert to Census block group GEOID
-    population_urban = population * urban
-  ) %>%
-  group_by(GEOID10) %>%
-  summarise(
-    population = sum(population),
-    population_urban = sum(population_urban),
-    pct_population_urban = sum(population_urban) / sum(population),
-    fully_predicted = as.numeric(all(fully_predicted == 1))
-  ) %>%
-  mutate(urban = as.numeric(pct_population_urban > 0.75))
+write.csv(blocks_2000_classification, gzfile(file.path(CLASSIFICATIONS_DIR, "blocks_2000.csv.gz")), row.names = FALSE)
+write.csv(blocks_2010_classification, gzfile(file.path(CLASSIFICATIONS_DIR, "blocks_2010.csv.gz")), row.names = FALSE)
 
 # Verify that summed Census block populations agree with block group populations
-
+# 
+# block_groups_2000_classification <- blocks_2000_classification %>%
+#   mutate(
+#     BKGPIDFP00 = substr(BLKIDFP00, 1, 12), # Convert to Census block group GEOID
+#     population_urban = population * urban
+#   ) %>%
+#   group_by(BKGPIDFP00) %>%
+#   summarise(
+#     population = sum(population),
+#     population_urban = sum(population_urban),
+#     pct_population_urban = sum(population_urban) / sum(population),
+#     fully_predicted = as.numeric(all(fully_predicted == 1))
+#   ) %>%
+#   mutate(urban = as.numeric(pct_population_urban > PCT_POP_URBAN_CUTOFF))
+# 
+# block_groups_2010_classification <- blocks_2010_classification %>%
+#   mutate(
+#     GEOID10 = substr(GEOID10, 1, 12), # Convert to Census block group GEOID
+#     population_urban = population * urban
+#   ) %>%
+#   group_by(GEOID10) %>%
+#   summarise(
+#     population = sum(population),
+#     population_urban = sum(population_urban),
+#     pct_population_urban = sum(population_urban) / sum(population),
+#     fully_predicted = as.numeric(all(fully_predicted == 1))
+#   ) %>%
+#   mutate(urban = as.numeric(pct_population_urban > 0.75))
+# 
 # read.csv(file.path(DECENNIAL_DIR, "2010_blck_grp.csv.gz")) %>%
 #   transmute(
 #     population_nhgis = population,
@@ -269,7 +272,7 @@ block_groups_2010_classification <- blocks_2010_classification %>%
 #   transmute(agree = population == population_nhgis) %>%
 #   pull(agree) %>%
 #   table()
-
+# 
 # read.csv(file.path(DECENNIAL_DIR, "2000_blck_grp.csv.gz")) %>%
 #   transmute(
 #     population_nhgis = population,
@@ -279,23 +282,69 @@ block_groups_2010_classification <- blocks_2010_classification %>%
 #   transmute(agree = population == population_nhgis) %>%
 #   pull(agree) %>%
 #   table()
-
-# Write out ---------------------------------------------------------------
-
+# 
 # addmargins(
 #   table(blocks_2000_classification$urban) / nrow(blocks_2000_classification) * 100
 # )
 # addmargins(
 #   table(blocks_2010_classification$urban) / nrow(blocks_2010_classification) * 100
 # )
-# addmargins(
-#   table(block_groups_2000_classification$urban) / nrow(block_groups_2000_classification) * 100
-# )
-# addmargins(
-#   table(block_groups_2010_classification$urban) / nrow(block_groups_2010_classification) * 100
-# )
 
-write.csv(blocks_2000_classification, gzfile(file.path(CLASSIFICATIONS_DIR, "blocks_2000.csv.gz")), row.names = FALSE)
-write.csv(blocks_2010_classification, gzfile(file.path(CLASSIFICATIONS_DIR, "blocks_2010.csv.gz")), row.names = FALSE)
-write.csv(block_groups_2000_classification, gzfile(file.path(CLASSIFICATIONS_DIR, "block_groups_2000.csv.gz")), row.names = FALSE)
-write.csv(block_groups_2010_classification, gzfile(file.path(CLASSIFICATIONS_DIR, "block_groups_2010.csv.gz")), row.names = FALSE)
+# Parent geography classifications ----------------------------------------
+
+geography <- "block_groups"
+
+generate_classifications <- function(geography, # "block_groups" / "tracts" / "counties'
+                                     year # 2000 / 2010
+                                     ) {
+  geoid_length <- GEOID_LENGTHS[[geography]]
+  if (year == 2000) {
+    classification <- blocks_2000_classification
+    block_geoid_column <- "BLKIDFP00"
+    geoid_column <- GEOID_NAMES_2000[[geography]]
+  } else {
+    classification <- blocks_2010_classification
+    block_geoid_column <- "GEOID10"
+    geoid_column <- "GEOID10"
+  }
+  
+  classification %>%
+    mutate(
+      # Truncate GEOID - see:
+      # https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html
+      !!geoid_column := substr(get(block_geoid_column), 1, geoid_length),
+      population_urban = population * urban
+    ) %>%
+    group_by(across(geoid_column)) %>%
+    summarise(
+      population = sum(population),
+      population_urban = sum(population_urban),
+      pct_population_urban = sum(population_urban) / sum(population),
+      fully_predicted = as.numeric(all(fully_predicted == 1))
+    ) %>%
+    mutate(urban = as.numeric(pct_population_urban > PCT_POP_URBAN_CUTOFF))
+}
+
+invisible(pbapply(
+  expand.grid(
+    geography = setdiff(unique(names(GEOID_LENGTHS)), "blocks"),
+    year = c(2000, 2010)
+  ),
+  1,
+  function(row) {
+    output_file <- file.path(
+      CLASSIFICATIONS_DIR,
+      sprintf("%s_%s.csv.gz", row["geography"], row["year"])
+    )
+    if (file.exists(output_file)) {
+      message(sprintf("Skipping: %s", output_file))
+    } else {
+      message(sprintf("Generating: %s", output_file))
+      write.csv(
+        generate_classifications(row["geography"], row["year"]),
+        gzfile(output_file),
+        row.names = FALSE
+      )
+    }
+  }
+))

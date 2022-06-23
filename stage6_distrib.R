@@ -16,19 +16,21 @@ source("util.R")
 pboptions(type = "timer")
 
 generate_distrib <- function(region, # e.g. "NE1"
-                             geography, # "blocks_2000" / "blocks_2010"
+                             geography, # "blocks" / "block_groups" / "tracts" / "counties"
+                             year, # 2000 / 2010
                              species, # e.g. "ec"
                              urban_rural # "urban" / "rural"
                              ) {
-  geoid_column <- fcase(
-    geography == "blocks_2000", "BLKIDFP00",
-    geography == "block_groups_2000", "BKGPIDFP00",
-    default = "GEOID10"
-  )
+  geography_name <- sprintf("%s_%s", geography, year)
+  if (year == 2000) {
+    geoid_column <- GEOID_NAMES_2000[[geography]]
+  } else {
+    geoid_column <- "GEOID10"
+  }
   
   message("> Reading classifications")
   classifications <- fread(
-    file.path(CLASSIFICATIONS_DIR, sprintf("%s.csv.gz", geography)),
+    file.path(CLASSIFICATIONS_DIR, sprintf("%s.csv.gz", geography_name)),
     colClasses = list(character = geoid_column)
   )
   
@@ -36,7 +38,7 @@ generate_distrib <- function(region, # e.g. "NE1"
   aggregated <- fread(
     sprintf(
       "output/aggregated/%s_%s_%s_%s.csv.gz",
-      region, geography, urban_rural, species
+      region, geography_name, urban_rural, species
     ),
     colClasses = list(character = geoid_column)
   )
@@ -49,7 +51,7 @@ generate_distrib <- function(region, # e.g. "NE1"
     result <- aggregated
   }
   
-  if (grepl("blocks", geography)) {
+  if (grepl("blocks", geography_name)) {
     message("> Choosing best predictor and subsetting columns")
     result <- result[, predicted := fifelse(is.na(predicted_within),
                                         predicted_nearest,
@@ -65,7 +67,8 @@ invisible(pbapply(
   expand.grid(
     region = names(FIPS_BY_REGION),
     # region = "NE1",
-    geography = c("blocks_2000", "blocks_2010", "block_groups_2000", "block_groups_2010"),
+    geography = names(GEOID_LENGTHS),
+    year = c(2000, 2010),
     species = unique(get_predicted_files("Non-urban areas at 1km spatial resolution")$species),
     # species = "ec",
     urban_rural = c("urban", "rural")
@@ -75,8 +78,8 @@ invisible(pbapply(
     output_file <- file.path(
       DISTRIB_DIR,
       sprintf(
-        "%s_%s_%s_%s.csv.gz",
-        row["region"], row["geography"], row["urban_rural"], row["species"]
+        "%s_%s_%s_%s_%s.csv.gz",
+        row["region"], row["geography"], row["year"], row["urban_rural"], row["species"]
       )
     )
     if (!file.exists(output_file)) {
@@ -85,6 +88,7 @@ invisible(pbapply(
         generate_distrib(
           region = row["region"],
           geography = row["geography"],
+          year = row["year"],
           species = row["species"],
           urban_rural = row["urban_rural"]
         ),

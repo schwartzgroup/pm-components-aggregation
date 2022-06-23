@@ -16,23 +16,25 @@ pboptions(type = "timer")
 
 # Aggregate ---------------------------------------------------------------
 
-aggregate_block_groups <- function(region, # e.g. "NE1"
-                                   geography, # "blocks_2000" / "blocks_2010"
-                                   species, # e.g. "ec"
-                                   urban_rural # "urban" / "rural"
-                                   ) {
-  if (geography == "blocks_2000") {
+aggregate_larger_geographies <- function(region, # e.g. "NE1"
+                                         blocks, # "blocks_2000" / "blocks_2010"
+                                         species, # e.g. "ec"
+                                         urban_rural, # "urban" / "rural"
+                                         aggregated_geography = "block_groups" # "block_groups" / "tracts" / "counties"
+                                         ) {
+  if (grepl("2000", blocks)) {
     block_geoid_column <- "BLKIDFP00"
-    block_group_geoid_column <- "BKGPIDFP00"
+    geoid_column <- GEOID_NAMES_2000[[aggregated_geography]]
   } else {
     block_geoid_column <- "GEOID10"
-    block_group_geoid_column <- "GEOID10"
+    geoid_column <- "GEOID10"
   }
-  block_group_geography <- gsub("blocks", "block_groups", geography)
+  block_group_geography <- gsub("blocks", aggregated_geography, blocks)
+  geoid_length <- GEOID_LENGTHS[[aggregated_geography]]
   
   message("> Reading block classifications")
   block_classifications <- fread(
-    file.path(CLASSIFICATIONS_DIR, sprintf("%s.csv.gz", geography)),
+    file.path(CLASSIFICATIONS_DIR, sprintf("%s.csv.gz", blocks)),
     colClasses = list(character = block_geoid_column)
   )
   
@@ -40,7 +42,7 @@ aggregate_block_groups <- function(region, # e.g. "NE1"
   aggregated <- fread(
     sprintf(
       "output/aggregated/%s_%s_%s_%s.csv.gz",
-      region, geography, urban_rural, species
+      region, blocks, urban_rural, species
     ),
     colClasses = list(character = block_geoid_column)
   )
@@ -53,27 +55,28 @@ aggregate_block_groups <- function(region, # e.g. "NE1"
   
   # data.table cascaded bracket syntax is very messy here - using one operation
   # on each line instead
-  message("> Generating block group-level aggregates")
+  message(sprintf("> Generating higher-level aggregates (%s)", aggregated_geography))
   result <- block_classifications[aggregated, on = block_geoid_column]
   result <- result[, predicted := fifelse(is.na(predicted_within),
                                           predicted_nearest,
                                           predicted_within)]
-  result <- result[, (block_group_geoid_column) := substr(get(block_geoid_column), 1, 12)]
+  result <- result[, (geoid_column) := substr(get(block_geoid_column), 1, geoid_length)]
   result <- result[, list(predicted = sum(predicted * population) / sum(population),
                           pct_pop_predicted = sum(!is.na(predicted_within)) / .N),
-                   by = c("year", block_group_geoid_column)]
+                   by = c("year", geoid_column)]
   
   return(result)
 }
 
 invisible(pbapply(
   expand.grid(
-    # region = names(FIPS_BY_REGION),
-    region = "NE1",
-    geography = c("blocks_2000", "blocks_2010"),
-    # species = unique(get_predicted_files("Non-urban areas at 1km spatial resolution")$species),
-    species = "ec",
-    urban_rural = c("urban", "rural")
+    region = names(FIPS_BY_REGION),
+    # region = "NE1",
+    blocks = c("blocks_2000", "blocks_2010"),
+    species = unique(get_predicted_files("Non-urban areas at 1km spatial resolution")$species),
+    # species = "ec",
+    urban_rural = c("urban", "rural"),
+    aggregated_geography = setdiff(names(GEOID_LENGTHS), "blocks")
   ),
   1,
   function(row) {
@@ -81,17 +84,19 @@ invisible(pbapply(
       AGGREGATED_DIR,
       sprintf(
         "%s_%s_%s_%s.csv.gz",
-        row["region"], gsub("blocks", "block_groups", row["geography"]), row["urban_rural"], row["species"]
+        row["region"], gsub("blocks", row["aggregated_geography"], row["blocks"]),
+        row["urban_rural"], row["species"]
       )
     )
     if (!file.exists(output_file)) {
       message(sprintf("Generating %s", output_file))
       fwrite(
-        aggregate_block_groups(
+        aggregate_larger_geographies(
           region = row["region"],
-          geography = row["geography"],
+          blocks = row["blocks"],
           species = row["species"],
-          urban_rural = row["urban_rural"]
+          urban_rural = row["urban_rural"],
+          aggregated_geography = row["aggregated_geography"]
         ),
         output_file
       )
