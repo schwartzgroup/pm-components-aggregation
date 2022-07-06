@@ -65,7 +65,8 @@ generate_distrib <- function(region, # e.g. "NE1"
 
 invisible(pbapply(
   expand.grid(
-    region = names(FIPS_BY_REGION),
+    # region = names(FIPS_BY_REGION),
+    region = setdiff(names(FIPS_BY_REGION), "M8"),
     # region = "NE1",
     geography = names(GEOID_LENGTHS),
     year = c(2000, 2010),

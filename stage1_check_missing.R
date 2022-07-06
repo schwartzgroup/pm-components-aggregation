@@ -28,8 +28,8 @@ xtabs(~ region + year + species, data = rural_files)
 # / species / urban classification combination
 invisible(pbapply(
   expand.grid(
-    # region = unique(urban_files$region),
-    region = "M8",
+    region = unique(urban_files$region),
+    # region = "M8",
     species = unique(urban_files$species),
     urban_rural = c("rural", "urban")
   ),
@@ -79,3 +79,4 @@ message(paste(
   names(all_counts[sapply(all_counts, length) > 1]),
   collapse = "\n"
 ))
+

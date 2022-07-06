@@ -52,6 +52,7 @@ read_data <- function(files, current_region, current_species) {
     files_to_read,
     1,
     function(row) {
+      # data <- readRDS(row["path"])
       data <- readRDS(row["path"])[, c("year", prediction_column)]
       names(data) <- c("year", "predicted")
       return(data)
@@ -133,12 +134,13 @@ aggregate_blocks <- function(region, # e.g. "NE1"
 
 pbapply(
   expand.grid(
-    region = names(FIPS_BY_REGION),
+    region = setdiff(names(FIPS_BY_REGION), "M8"),
+    # region = "M8",
     urban_rural = c("rural", "urban"),
     geography = c("blocks_2000", "blocks_2010"),
     # geography = c("blocks_2010", "blocks_2000"),
-    species = unique(urban_files$species)
-    # species = c("ec", setdiff(urban_files$species, "ec")) # prioritize EC
+    # species = unique(urban_files$species)
+    species = c("ec", setdiff(urban_files$species, "ec")) # prioritize EC
   ),
   1,
   function(row) {
