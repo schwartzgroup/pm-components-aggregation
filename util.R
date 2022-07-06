@@ -42,12 +42,16 @@ GEOID_NAMES_2000 <- c(
 
 ## Inputs ----
 
-POLYGONS_DIR = "/media/qnap3/ShapeFiles/Polygons"
+POLYGONS_DIR = "/media/qnap4/Covariates/census/external/tiger/"
 
-DECENNIAL_DIR = "/media/qnap4/Covariates/nhgis/output/"
+DECENNIAL_DIR = "/media/qnap4/Covariates/census/output/tables/decennial/"
+
+EXTERNAL_CROSSWALKS = "crosswalks_external"
 
 # This directory should contain all of Heresh's model prediction files
 HERESH_DATA_DIR <- "/media/qnap4/Heresh/"
+
+dir.create(EXTERNAL_CROSSWALKS, showWarnings = FALSE)
 
 ## Outputs ----
 
