@@ -36,9 +36,9 @@ mkdir -p "$CROSSWALKS_DIR"
 # Given a GeoPackage layer of all Census blocks in the U.S., create subsets of
 # the blocks in different tables according to region
 function create_regional_subsets() {
-    blocks_gpkg="$1"  # e.g. blocks_2000.gpkg / blocks_2010.gpkg
-    blocks_layer="$2" # e.g. blocks_2000 / blocks_2010
-    geoid_field="$3"  # e.g. BLKIDFP00 / GEOID10
+    blocks_gpkg="$1"  # e.g. blocks_2000.gpkg / blocks_2010.gpkg / blocks_2020.gpkg
+    blocks_layer="$2" # e.g. blocks_2000 / blocks_2010 / blocks_2020
+    geoid_field="$3"  # e.g. BLKIDFP00 / GEOID10 / GEOID20
     for i in $(seq 1 $[n_regions / 2])
     do
         region=${REGIONS[($i - 1) * 2]}
@@ -59,9 +59,9 @@ function create_regional_subsets() {
 # Given a GeoPackage layer of all Census blocks in the U.S., create subsets of
 # *centroids* of the blocks in different tables according to region
 function create_regional_centroids() {
-    blocks_gpkg="$1"  # e.g. blocks_2000.gpkg / blocks_2010.gpkg
-    blocks_layer="$2" # e.g. blocks_2000 / blocks_2010
-    geoid_field="$3"  # e.g. BLKIDFP00 / GEOID10
+    blocks_gpkg="$1"  # e.g. blocks_2000.gpkg / blocks_2010.gpkg / blocks_2020.gpkg
+    blocks_layer="$2" # e.g. blocks_2000 / blocks_2010 / blocks_2020
+    geoid_field="$3"  # e.g. BLKIDFP00 / GEOID10 / GEOID20
     for i in $(seq 1 $[n_regions / 2])
     do
         region=${REGIONS[($i - 1) * 2]}
@@ -84,8 +84,8 @@ function create_regional_centroids() {
 # entire U.S.
 function generate_crosswalks_within() {
     working_gpkg="$1" # e.g. working.gpkg
-    blocks_layer="$2" # e.g. blocks_2000 / blocks_2010
-    geoid_field="$3"  # e.g. BLKIDFP00 / GEOID10
+    blocks_layer="$2" # e.g. blocks_2000 / blocks_2010 / blocks_2020
+    geoid_field="$3"  # e.g. BLKIDFP00 / GEOID10 / GEOID20
     output_dir="$4"   # e.g. "." / crosswalks
     mkdir -p "$output_dir"
     for i in $(seq 1 $[n_regions / 2])
@@ -111,8 +111,8 @@ function generate_crosswalks_within() {
 # U.S., using the regional subsets created by `create_regional_subsets()`
 function generate_crosswalks_within_subsets() {
     working_gpkg="$1" # e.g. working.gpkg
-    blocks_layer_prefix="$2" # e.g. blocks_2000 / blocks_2010
-    geoid_field="$3"  # e.g. BLKIDFP00 / GEOID10
+    blocks_layer_prefix="$2" # e.g. blocks_2000 / blocks_2010 / blocks_2020
+    geoid_field="$3"  # e.g. BLKIDFP00 / GEOID10 / GEOID20
     output_dir="$4"   # e.g. "." / crosswalks
     mkdir -p "$output_dir"
     for i in $(seq 1 $[n_regions / 2])
@@ -134,16 +134,16 @@ function generate_crosswalks_within_subsets() {
 }
 
 # Import layers into the working GeoPackage
-#find "$GRIDS_DIR"/* "$GEO_DIR"/blocks_{2000,2010}.gpkg |
+#find "$GRIDS_DIR"/* "$GEO_DIR"/blocks_{2000,2010,2020}.gpkg |
 echo "Importing layers"
-find "$GEO_DIR"/blocks_{2000,2010}.gpkg |
+find "$GEO_DIR"/blocks_{2000,2010,2020}.gpkg |
     sort |
     while read gpkg
     do
         echo "$gpkg"
         layer_name=$(basename $gpkg .gpkg)
-        echo "importing ${gpkg}::${layer_name} => ${WORKING_DB}"
-        if [ -f "$WORKING_DB" ]
+        echo "importing ${gpkg}::${layer_name} => ${WORKING_GPKG_TEMP}"
+        if [ -f "$WORKING_GPKG_TEMP" ]
         then
             ogr2ogr -f GPKG "$WORKING_GPKG_TEMP" "$gpkg" -nln "$layer_name" -update
         else
@@ -155,24 +155,29 @@ find "$GEO_DIR"/blocks_{2000,2010}.gpkg |
 echo "Creating Census block subsets"
 create_regional_subsets "$WORKING_GPKG_TEMP" blocks_2000 BLKIDFP00
 create_regional_subsets "$WORKING_GPKG_TEMP" blocks_2010 GEOID10
+create_regional_subsets "$WORKING_GPKG_TEMP" blocks_2020 GEOID20
 
 # Create Census block centroid subsets
 echo "Creating Census block centroid subsets"
 create_regional_centroids "$WORKING_GPKG_TEMP" blocks_2000 BLKIDFP00
 create_regional_centroids "$WORKING_GPKG_TEMP" blocks_2010 GEOID10
+create_regional_centroids "$WORKING_GPKG_TEMP" blocks_2020 GEOID20
 
 # Drop the non-subsetted data
 ogrinfo "$WORKING_GPKG_TEMP" -sql "DROP TABLE blocks_2000"
 ogrinfo "$WORKING_GPKG_TEMP" -sql "DROP TABLE blocks_2010"
+ogrinfo "$WORKING_GPKG_TEMP" -sql "DROP TABLE blocks_2020"
 ogrinfo "$WORKING_GPKG_TEMP" -sql "VACUUM"
 
 # DEPRECATED - use QGIS or PostGIS instead (much faster)
 # generate_crosswalks_within "$WORKING_GPKG_TEMP" blocks_2000 BLKIDFP00 "$CROSSWALKS_DIR"
 # generate_crosswalks_within "$WORKING_GPKG_TEMP" blocks_2010 GEOID10 "$CROSSWALKS_DIR"
+# generate_crosswalks_within "$WORKING_GPKG_TEMP" blocks_2020 GEOID20 "$CROSSWALKS_DIR"
 
 # DEPRECATED - use QGIS or PostGIS instead (much faster)
 # generate_crosswalks_within_subsets "$WORKING_GPKG_TEMP" blocks_2000 BLKIDFP00 "$CROSSWALKS_DIR"
 # generate_crosswalks_within_subsets "$WORKING_GPKG_TEMP" blocks_2010 GEOID10 "$CROSSWALKS_DIR"
+# generate_crosswalks_within_subsets "$WORKING_GPKG_TEMP" blocks_2020 GEOID20 "$CROSSWALKS_DIR"
 
 # Finished - move the GeoPackage to the project directory
 echo "Moving GeoPackage"
